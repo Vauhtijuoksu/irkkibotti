@@ -1,0 +1,20 @@
+[package]
+name = "botanicsbot"
+description = "A home grown Twitch bot"
+license = "MIT"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+tokio = { version = "1", features = ["macros", "signal", "rt-multi-thread", "fs"] }
+tokio-stream = "*"
+
+irc = { git = "https://github.com/aatxe/irc.git", branch="develop" }
+anyhow = "*"
+itertools = "*"
+
+regex = "*"
+linkify = "*"
+
+serde = "*"
+serde_json = "*"
