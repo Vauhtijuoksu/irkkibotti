@@ -57,20 +57,10 @@ pub struct BotConfig {
 }
 
 pub async fn new_twitch(bot_config: BotConfig) -> Result<irc::client::Client, anyhow::Error> {
-    /*
-    let adhoc_conf = irc::client::prelude::Config {
-        nickname: Some("botanicsbot".to_owned()),
-        server: Some("irc.twitch.tv".to_owned()),
-        port: Some(6667),
-        channels: vec!["#olenananas".to_owned()],
-        use_tls: Some(false),
-        ..irc::client::prelude::Config::default()
-    };
-    */
     let irc_conf = irc::client::prelude::Config {
         nickname: Some(bot_config.nickname.to_owned()),
-        server: Some("irc.twitch.tv".to_owned()),
-        port: Some(6667),
+        server: Some(bot_config.server.to_owned()),
+        port: Some(bot_config.port),
         channels: bot_config.channels,
         use_tls: bot_config.use_tls,
         ..irc::client::prelude::Config::default()
