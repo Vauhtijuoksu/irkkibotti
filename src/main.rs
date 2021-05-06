@@ -1,5 +1,7 @@
 #![feature(once_cell)]
 
+use std::collections::{HashSet, HashMap};
+
 mod config;
 mod irc_client;
 
@@ -16,7 +18,8 @@ async fn make_dummy_string() -> String {
 
 #[derive(Deserialize, Debug)]
 struct ProgramConfig {
-    twitch_config: irc_client::BotConfig
+    twitch_config: irc_client::BotConfig,
+    channel_configs: HashMap<String, irc_client::InputChannelConfig>
 }
 
 
@@ -27,6 +30,10 @@ async fn main() {
     let bc : ProgramConfig = serde_json::from_str(&config_json).expect("could not read config");
     
     println!("config:\n {}", config_json);
+
+    for (channel, conf) in &bc.channel_configs {
+        irc_client::prepare_channel(channel, conf).await;
+    }
 
     let mut sigint_stream = signal(SignalKind::interrupt()).unwrap();
     let mut twitch_client = irc_client::new_twitch(bc.twitch_config).await.unwrap();

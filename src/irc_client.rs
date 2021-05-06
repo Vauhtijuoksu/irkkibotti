@@ -10,12 +10,35 @@ use itertools::Itertools;
 use linkify::{LinkFinder, LinkKind};
 
 const SHORT_TIMEOUT_SECONDS: u32 = 10;
+static GLOBAL_BLACKLIST: SyncOnceCell<HashSet<String>> = SyncOnceCell::new();
 
-#[derive(PartialEq)]
+fn global_blacklist() -> &'static HashSet<String> {
+    GLOBAL_BLACKLIST.get_or_init(|| {
+        let mut blacklist = HashSet::new();
+
+        blacklist.insert("reload-conf".to_owned());
+        blacklist.insert("update".to_owned());
+        blacklist.insert("edit".to_owned());
+        blacklist.insert("add".to_owned());
+        blacklist.insert("newmod".to_owned());
+
+        blacklist
+    })
+}
+
+#[derive(PartialEq, Debug)]
 pub enum Role {
     Owner,
     Mode,
     Peasant,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct InputChannelConfig {
+    pub known_users : Option<HashSet<String>>,
+    pub bot_admins : Option<HashSet<String>>,
+    pub channel_text_commands : Option<HashMap<String, String>>,
+    pub command_blacklist : Option<HashSet<String>>,
 }
 
 struct ChannelConfig {
@@ -33,14 +56,51 @@ fn global_state_map() -> &'static RwLock<HashMap<String, ChannelConfig>> {
 }
 
 fn load_channel_state(channel: &str) -> ChannelConfig {
-    // read from json config file using serde, or return default if file
+    // read from json file using serde, or return default if file
     // doesn't exist
     return ChannelConfig {
         known_users: HashSet::new(),
         bot_admins : HashSet::new(),
         channel_text_commands : HashMap::new(),
-        command_blacklist : HashSet::new(),
+        command_blacklist : global_blacklist().to_owned(),
     }
+}
+
+pub async fn prepare_channel(channel: &str, conf: &InputChannelConfig) {
+    {
+        if global_state_map().read().await.contains_key(channel) {
+            eprintln!("cannot configure channel {}, already configured", channel);
+            return
+        }
+    }
+
+    let mut unlocked_state = global_state_map().write().await;
+    unlocked_state.insert(channel.to_owned(), ChannelConfig {
+        known_users: match &conf.known_users {
+            Some(users) => users.to_owned(),
+            None => HashSet::new()
+        },
+        bot_admins: match &conf.bot_admins {
+            Some(users) => users.to_owned(),
+            None => HashSet::new()
+        },
+        channel_text_commands: match &conf.channel_text_commands {
+            Some(cmds) => cmds.to_owned(),
+            None => HashMap::new()
+        },
+        command_blacklist: match &conf.command_blacklist {
+            Some(blacklist) => {
+                let mut combined : HashSet<String> = HashSet::new();
+
+                for cmd in global_blacklist().union(blacklist) {
+                    combined.insert(cmd.to_owned());
+                }
+
+                combined
+            }
+            None => global_blacklist().to_owned()
+        }
+    });
 }
 
 fn save_state() {
@@ -216,6 +276,17 @@ async fn handle_bot_command(client: &irc::client::Client, message: &ParsedMessag
     if message.body.starts_with('!') {
         let parts: Vec<&str> = message.body.splitn(2, ' ').collect();
         eprintln!("command with {} parts", parts.len());
+        {
+            let read_state = global_state_map().read().await;
+            let blacklist = &read_state.get(&message.channel).unwrap().command_blacklist;
+
+            println!("{:?}", blacklist);
+
+            if blacklist.contains(parts[0]) || blacklist.contains(parts[0].trim_start_matches("!")) {
+                eprintln!("blacklisted command {} ignored", parts[0]);
+                return false;
+            }
+        }
         match parts.len() {
             1 => { 
                 let read_state = global_state_map().read().await;
@@ -263,9 +334,11 @@ pub async fn handle_msg(client: &irc::client::Client, raw: Message) -> String {
 
     handle_bot_command(&client, &message, &role, &known_user).await;
 
+    eprintln!("msg from {:?} {}", &role, &message.sender);
+/*
     if role == Role::Owner {
         client.send_privmsg(message.channel, "/mods").unwrap();
     }
-
+*/
     message.body
 }
