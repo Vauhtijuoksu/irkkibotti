@@ -45,6 +45,9 @@ async fn main() {
         .unwrap();
 
     'main: loop {
+        let wakeup = tokio::time::sleep(tokio::time::Duration::from_secs(1));
+        tokio::pin!(wakeup);
+
         let text = tokio::select! {
             irc_msg = twitch_stream.next() => {
                 if irc_msg.is_some() {
@@ -55,6 +58,9 @@ async fn main() {
                 } else {
                     make_dummy_string().await
                 }
+            }
+            _ = &mut wakeup => {
+                "timeout".to_string()
             }
             _ = sigint_stream.recv() => {
                 println!("got sigint");

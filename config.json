@@ -1,0 +1,26 @@
+{
+    "twitch_config" : {
+        "nickname" : "VauhtiBOT",
+        "server": "irc.twitch.tv",
+        "port": 6667,
+        "channels" : ["#vauhtijuoksu"],
+        "use_tls": false,
+        "auth_token": "<INSERT_OAUTH_TOKEN_HERE>"
+    },
+    "channel_configs" : {
+        "#vauhtijuoksu" : {
+            "bot_admins" : [
+                "olenananas",
+                "jsloth",
+                "run_tu",
+                "mega0tron",
+                "nahkavj"
+            ],
+            "command_blacklist" : [
+                "shoot",
+                "update",
+                "l"
+            ]
+        }
+    }
+}
